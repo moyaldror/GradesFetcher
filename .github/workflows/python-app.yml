@@ -1,0 +1,70 @@
+# REMOVE ME IN FORKED REPOSITORY
+
+name: GradeFetcher auto-update
+env:
+  ARTIFACT_NAME: 'db.zip'
+  ARTIFACT_FILE: 'db.7z'
+  DB_FILE: 'grades.db'
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  schedule:
+  - cron: "0 7-20 * * *"
+    
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: docker://joyzoursky/python-chromedriver:latest
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      shell: bash
+    - name: Fetch artifacts
+      env:
+        AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+      run: |
+        python artifact_fetcher.py $ARTIFACT_NAME $AUTH_TOKEN GET $GITHUB_REPOSITORY
+      shell: bash
+    - name: Extract artifacts
+      env:
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      run: |
+        if [ -f $ARTIFACT_NAME ]; then 7z x -y $ARTIFACT_NAME; 7z x -y -p$DB_PASSWORD $ARTIFACT_FILE; fi
+      shell: bash
+    - name: Fetch latest
+      env:
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        CHAT_ID: ${{ secrets.CHAT_ID }}
+        ID_NUMBER: ${{ secrets.ID_NUMBER }}
+        PASSWORD: ${{ secrets.PASSWORD }}
+        USER_NAME: ${{ secrets.USER_NAME }}
+      run: |
+        python fetcher.py $DB_FILE $USER_NAME $PASSWORD $ID_NUMBER $BOT_TOKEN $CHAT_ID
+    - name: Create artifact archive
+      env:
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      run:
+        7z a -p$DB_PASSWORD $ARTIFACT_FILE $DB_FILE
+    - name: Delete old artifacts artifacts
+      env:
+        AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+      run: |
+        python artifact_fetcher.py $ARTIFACT_NAME $AUTH_TOKEN DELETE $GITHUB_REPOSITORY
+      shell: bash
+    - name: Upload db artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ env.ARTIFACT_NAME }}
+        path: ${{ env.ARTIFACT_FILE }}
+        if-no-files-found: error
