@@ -40,7 +40,7 @@ def delete_artifacts():
 
     # purge all artifacts
     for artifact in info['artifacts']:
-        requests.delete(ARTIFACTS_URL.format(REPO_NAME, artifact['id']), headers=HEADERS)
+        requests.delete(ARTIFACTS_URL.format(REPO_NAME, '/' + str(artifact['id'])), headers=HEADERS)
 
 
 if __name__ == '__main__':
